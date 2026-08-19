@@ -1,48 +1,37 @@
-# WireScout Beta
+# WireScout Beta — Accounts + Cloud Sync
 
-Offline-first electrician jobsite walkthrough PWA.
+Offline-first electrician jobsite walkthrough PWA with private user accounts and Supabase cloud backup.
 
-## GitHub Pages setup
+## What is included
 
-1. Create a new public repository named `wirescout-beta` under your GitHub account.
-2. Upload all files in this ZIP, preserving the folder structure.
-3. In GitHub, open **Settings → Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Select branch **main** and folder **/(root)**, then Save.
-6. GitHub will provide the Pages URL.
-7. Open that URL in Safari on iPhone and use **Share → Add to Home Screen**.
+- Everything from the previous multiple-choice/PDF-fix beta
+- Email + password Create Account / Sign In
+- Each user gets a separate private job list
+- Local/offline job cache remains available on the jobsite
+- Background cloud sync when online
+- Jobs stored under the signed-in user
+- Photos and voice notes backed up to a private cloud bucket
+- Multi-device job access after sign-in
+- Account management / Sign Out in Settings
+- Existing guest/local jobs migrate to the first account that signs in on that device
+- Row Level Security (RLS) SQL so users cannot read another user's jobs or files
 
-## Included in this beta
+## One-time Supabase setup
 
-- New jobs
-- Permit / inspection Yes / No / Not Sure
-- Multiple scopes per job
-- General Walkthrough
-- Service Upgrade
-- EV Charger
-- Generator
-- Panel / Subpanel
-- Kitchen Remodel
-- Bathroom Remodel
-- Lighting
-- Service Call / Troubleshooting
-- Addition / Remodel
-- Commercial
-- Custom Job
-- Local/offline autosave
-- Job-specific photos using IndexedDB
-- Text notes
-- Basic voice notes where browser support allows
-- English / Spanish interface setting
-- Job summary / print-to-PDF
-- JSON backup export
-- Installable PWA shell
+1. Create a Supabase project.
+2. Open **SQL Editor** and run the full `supabase-schema.sql` file included in this ZIP.
+3. In Supabase, open **Project Settings / API** and copy the Project URL and publishable (anon) key.
+4. Open `js/config.js` and replace:
+   - `YOUR_SUPABASE_URL`
+   - `YOUR_SUPABASE_PUBLISHABLE_KEY`
+5. In Supabase Auth settings, keep Email/Password enabled. If email confirmation is enabled, new users must confirm their email before signing in.
+6. Upload all files to the root of the `wirescout-beta` GitHub repository and replace the old files.
+7. Wait for GitHub Pages to redeploy, then hard-refresh/reopen WireScout.
 
-## Beta limitations
+## Security
 
-- No cloud backup yet.
-- Local browser storage can be cleared by the device/browser.
-- Voice recording support varies by browser.
-- PDF export uses the browser's print dialog.
-- Photos are stored locally and are not yet included in the printable summary.
-- This is a prototype for field testing, not yet an App Store release.
+The browser uses only the Supabase publishable key. The included SQL enables Row Level Security and uses the authenticated user's ID to isolate profiles, jobs, file metadata, and private storage paths. Never put a Supabase `service_role` / secret key in `js/config.js` or any GitHub Pages file.
+
+## Offline behavior
+
+WireScout saves locally first. If the internet is unavailable, work continues on the device. When the user is signed in and connectivity returns, WireScout syncs the local jobs to that user's cloud account.
