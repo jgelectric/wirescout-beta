@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1f3a" />
+  <title>WireScout Beta</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">⚡</div>
+      <div>
+        <strong>WireScout</strong>
+        <small id="tagline">Jobsite walkthroughs for electricians</small>
+      </div>
+    </div>
+    <div id="syncStatus" class="status">✓ Saved Offline</div>
+  </header>
+
+  <main id="app"></main>
+
+  <nav class="bottom-nav">
+    <button data-nav="jobs">Jobs</button>
+    <button data-nav="new" class="primary">＋ New Job</button>
+    <button data-nav="templates">Templates</button>
+    <button data-nav="settings">Settings</button>
+  </nav>
+
+  <template id="toastTemplate"><div class="toast"></div></template>
+
+  <script src="js/templates.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/translations.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
