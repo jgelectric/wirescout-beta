@@ -47,6 +47,13 @@ const WSCloud = (() => {
   }
   async function signOut(){ if(client) await client.auth.signOut(); user=null; WSDB.setUserNamespace(null); emit(); }
 
+  async function getProfile(){
+    if(!client||!user) return null;
+    const {data,error}=await client.from("profiles").select("email,display_name,company_name,plan,plan_status,billing_status,subscription_started_at,subscription_ends_at").eq("id",user.id).maybeSingle();
+    if(error){ console.warn("WireScout profile load failed",error); return null; }
+    return data||null;
+  }
+
   async function migrateGuestJobs(){
     if(!user) return;
     const guest=WSDB.getGuestJobs();
@@ -112,5 +119,5 @@ const WSCloud = (() => {
     return out;
   }
 
-  return {configured,isReady,getUser,getClient,init,signUp,signIn,signOut,saveJob,deleteJob,syncJobs,saveFile,getFiles};
+  return {configured,isReady,getUser,getClient,init,signUp,signIn,signOut,getProfile,saveJob,deleteJob,syncJobs,saveFile,getFiles};
 })();

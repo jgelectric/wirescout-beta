@@ -2,6 +2,12 @@
 const app = document.getElementById("app");
 let state = {view:"jobs", jobId:null, scopeId:null, sectionIndex:0};
 const settings = WSDB.getSettings();
+const TRIAL_KEY = "wirescout_trial_v1";
+function trialActive(){ return localStorage.getItem(TRIAL_KEY)==="1" && !WSCloud.getUser(); }
+function startTrial(){ localStorage.setItem(TRIAL_KEY,"1"); WSDB.setUserNamespace(null); }
+function endTrial(){ localStorage.removeItem(TRIAL_KEY); }
+function trialLimitReached(){ return trialActive() && WSDB.getGuestJobs().length >= 1; }
+
 
 function t(k){ return (WS_I18N[settings.language]||WS_I18N.en)[k]||k; }
 function id(){ return crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2); }
@@ -21,7 +27,7 @@ async function saveJob(job){
 
 document.querySelectorAll(".bottom-nav button").forEach(b=>b.onclick=()=>navigate(b.dataset.nav));
 function navigate(v){
-  if(WSCloud.configured() && !WSCloud.getUser() && !["settings","account"].includes(v)) v="account";
+  if(WSCloud.configured() && !WSCloud.getUser() && !trialActive() && !["settings","account"].includes(v)) v="account";
   state.view=v; state.jobId=null; state.scopeId=null; state.sectionIndex=0; render();
 }
 
@@ -31,25 +37,35 @@ function render(){
   else if(state.view==="templates") renderTemplates();
   else if(state.view==="settings") renderSettings();
   else if(state.view==="account") renderAccount();
+  else if(state.view==="plans") renderPlans();
   else if(state.view==="job") renderJob();
   else if(state.view==="scope") renderScope();
 }
 
 function renderJobs(){
   const jobs=WSDB.getJobs();
-  app.innerHTML=`<div class="row space"><div><div class="kicker">WireScout Beta</div><h1>${t("jobs")}</h1></div><button class="btn primary" id="newTop">＋ ${t("newJob")}</button></div>
+  const trialBanner=trialActive()?`<div class="notice trial-notice"><b>Trial Mode</b> — Try one complete job without an account. <button class="link-btn" id="trialCreateAccount">Create a free account to keep it</button></div>`:"";
+  app.innerHTML=`<div class="row space"><div><div class="kicker">WireScout Beta</div><h1>${t("jobs")}</h1></div><button class="btn primary" id="newTop">＋ ${t("newJob")}</button></div>${trialBanner}
   ${jobs.length?jobs.map(j=>{
     const done=j.scopes?.length?Math.round(j.scopes.reduce((a,s)=>a+(s.complete?1:0),0)/j.scopes.length*100):0;
     return `<div class="card job-card" data-job="${j.id}">
       <div><b>${esc(j.customer||"Untitled Job")}</b><div class="meta">${esc(j.address||"")} • ${esc(j.date||"")}</div><div class="progress"><div style="width:${done}%"></div></div></div>
       <div>›</div></div>`;
   }).join(""):`<div class="card empty">No jobs yet.<br><br><button class="btn primary" id="emptyNew">Create your first job</button></div>`}`;
-  document.getElementById("newTop").onclick=()=>navigate("new");
-  const en=document.getElementById("emptyNew"); if(en) en.onclick=()=>navigate("new");
+  const goNew=()=>{if(trialLimitReached()){toast("Trial includes one job. Create a free account to save more."); state.view="account"; render(); return;} navigate("new");};
+  document.getElementById("newTop").onclick=goNew;
+  const en=document.getElementById("emptyNew"); if(en) en.onclick=goNew;
+  const tca=document.getElementById("trialCreateAccount"); if(tca) tca.onclick=()=>{state.view="account";render();};
   document.querySelectorAll("[data-job]").forEach(el=>el.onclick=()=>{state.view="job";state.jobId=el.dataset.job;render();});
 }
 
 function renderNewJob(){
+  if(trialLimitReached()){
+    app.innerHTML=`<div class="auth-shell"><div class="auth-card"><div class="logo auth-logo">⚡</div><h1>Your trial job is ready</h1><p class="muted">The no-account trial includes one job. Create a free account to keep this job, sync it, and create more.</p><button class="btn primary block" id="trialUpgrade">Create Free Account</button><br><button class="btn block" id="trialBack">Back to Trial Job</button></div></div>`;
+    document.getElementById("trialUpgrade").onclick=()=>{state.view="account";render();};
+    document.getElementById("trialBack").onclick=()=>{state.view="jobs";render();};
+    return;
+  }
   const today=new Date().toISOString().slice(0,10);
   app.innerHTML=`<div class="kicker">Start Walkthrough</div><h1>${t("newJob")}</h1>
   <div class="card">
@@ -264,31 +280,48 @@ function renderAccount(){
   const u=WSCloud.getUser();
   if(u){
     const name=esc(u.user_metadata?.display_name||u.email||"WireScout User"), company=esc(u.user_metadata?.company_name||"");
-    app.innerHTML=`<div class="kicker">Account</div><h1>${name}</h1><div class="card"><h2>${company||"WireScout Account"}</h2><p class="muted">${esc(u.email||"")}</p><div class="account-ok">✓ Jobs, photos and voice notes sync to this account.</div><br><button class="btn primary block" id="goJobs">Go to My Jobs</button><br><button class="btn block" id="syncNow">Sync Now</button><br><button class="btn danger block" id="signOut">Sign Out</button></div>`;
+    app.innerHTML=`<div class="kicker">Account</div><h1>${name}</h1><div class="card"><h2>${company||"WireScout Account"}</h2><p class="muted">${esc(u.email||"")}</p><div class="account-ok">✓ Jobs, photos and voice notes sync to this account.</div><div id="planBox" class="notice" style="margin-top:14px">Loading your plan…</div><br><button class="btn primary block" id="goJobs">Go to My Jobs</button><br><button class="btn block" id="plansBtn">View Plans</button><br><button class="btn block" id="syncNow">Sync Now</button><br><button class="btn danger block" id="signOut">Sign Out</button></div>`;
     document.getElementById("goJobs").onclick=()=>navigate("jobs");
+    document.getElementById("plansBtn").onclick=()=>{state.view="plans";render();};
     document.getElementById("syncNow").onclick=async()=>{toast("Syncing…");await WSCloud.syncJobs();toast("Sync complete");render();};
     document.getElementById("signOut").onclick=async()=>{await WSCloud.signOut();state.view="account";render();};
+    WSCloud.getProfile().then(p=>{const box=document.getElementById("planBox");if(!box)return;const plan=(p?.plan||"beta").toUpperCase();const status=p?.plan_status||"active";box.innerHTML=`<b>${esc(plan)} PLAN</b><br><span class="muted">Status: ${esc(status)}${plan==="BETA"?" • Beta remains free while WireScout is being tested.":""}</span>`;});
     return;
   }
-  app.innerHTML=`<div class="auth-shell"><div class="auth-card"><div class="logo auth-logo">⚡</div><h1>Welcome to WireScout</h1><p class="muted">Sign in to keep your jobs under your own account and access them from another device.</p>
+  app.innerHTML=`<div class="auth-shell"><div class="auth-card"><div class="logo auth-logo">⚡</div><h1>Welcome to WireScout</h1><p><strong>Built for electricians, by a Master Electrician.</strong></p><p class="muted">Sign in to keep your jobs under your own account and access them from another device.</p>
   <div class="auth-tabs"><button class="pill active" id="tabSignIn">Sign In</button><button class="pill" id="tabCreate">Create Account</button></div>
-  <form id="authForm"><div id="createFields" class="hidden"><label>Your Name</label><input id="authName" autocomplete="name"><br><label>Company Name</label><input id="authCompany" autocomplete="organization"><br></div><label>Email</label><input id="authEmail" type="email" autocomplete="email" required><br><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" required><br><br><button class="btn primary block" id="authSubmit" type="submit">Sign In</button></form><p class="muted auth-note" id="authNote"></p></div></div>`;
+  <form id="authForm"><div id="createFields" class="hidden"><label>Your Name</label><input id="authName" autocomplete="name"><br><label>Company Name</label><input id="authCompany" autocomplete="organization"><br></div><label>Email</label><input id="authEmail" type="email" autocomplete="email" required><br><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" required><br><br><button class="btn primary block" id="authSubmit" type="submit">Sign In</button></form><p class="muted auth-note" id="authNote"></p><div class="auth-divider"><span>or</span></div><button class="btn block trial-btn" id="tryWireScout">Try WireScout — No Account</button><p class="muted auth-note">Try one complete job and generate a sample PDF. Create an account later to keep your work and sync across devices.</p></div></div>`;
   let mode="signin"; const createFields=document.getElementById("createFields"), submit=document.getElementById("authSubmit"), note=document.getElementById("authNote");
   function setMode(m){mode=m;createFields.classList.toggle("hidden",m!=="create");submit.textContent=m==="create"?"Create Account":"Sign In";document.getElementById("authPassword").autocomplete=m==="create"?"new-password":"current-password";document.getElementById("tabSignIn").classList.toggle("active",m==="signin");document.getElementById("tabCreate").classList.toggle("active",m==="create");note.textContent="";}
   document.getElementById("tabSignIn").onclick=()=>setMode("signin"); document.getElementById("tabCreate").onclick=()=>setMode("create");
-  document.getElementById("authForm").onsubmit=async e=>{e.preventDefault();submit.disabled=true;note.textContent="";try{const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(mode==="create"){const data=await WSCloud.signUp({email,password,displayName:document.getElementById("authName").value.trim(),companyName:document.getElementById("authCompany").value.trim()});if(data.session){toast("Account created");state.view="jobs";render();}else{note.textContent="Account created. Check your email to confirm your address, then sign in.";setMode("signin");}}else{await WSCloud.signIn(email,password);toast("Signed in");state.view="jobs";render();}}catch(err){note.textContent=err.message||"Unable to sign in.";}finally{submit.disabled=false;}};
+  document.getElementById("tryWireScout").onclick=()=>{startTrial();toast("Trial mode started");state.view="jobs";render();};
+  document.getElementById("authForm").onsubmit=async e=>{e.preventDefault();submit.disabled=true;note.textContent="";try{const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(mode==="create"){const data=await WSCloud.signUp({email,password,displayName:document.getElementById("authName").value.trim(),companyName:document.getElementById("authCompany").value.trim()});if(data.session){endTrial();toast("Account created");state.view="jobs";render();}else{note.textContent="Account created. Check your email to confirm your address, then sign in.";setMode("signin");}}else{await WSCloud.signIn(email,password);endTrial();toast("Signed in");state.view="jobs";render();}}catch(err){note.textContent=err.message||"Unable to sign in.";}finally{submit.disabled=false;}};
+}
+
+function renderPlans(){
+  const u=WSCloud.getUser();
+  app.innerHTML=`<div class="kicker">WireScout Plans</div><h1>Simple plans for the jobsite</h1><p class="muted">WireScout Beta is free right now. This screen prepares your account for paid plans later — no payment will be taken during beta.</p>
+  <div class="card"><h2>Beta</h2><div class="price">FREE</div><p>Full beta access while WireScout is being tested.</p><div class="account-ok">✓ Your current beta account stays active</div></div>
+  <div class="card"><h2>WireScout Pro</h2><div class="price">$9.99 <small>/ month</small></div><p class="muted">Planned launch price</p><p>Unlimited jobs • Cloud sync • Photos & voice notes • Professional PDFs</p><button class="btn primary block" id="proInterest">Pro — Coming Soon</button></div>
+  <div class="card"><h2>Pro Annual</h2><div class="price">$99 <small>/ year</small></div><p>Same Pro features with annual billing.</p><button class="btn block" id="annualInterest">Annual — Coming Soon</button></div>
+  <div class="notice"><b>No charges yet.</b> Stripe checkout will be connected only when you are ready to start billing customers.</div><br><button class="btn block" id="plansBack">Back to Account</button>`;
+  document.getElementById("plansBack").onclick=()=>{state.view=u?"account":"settings";render();};
+  document.getElementById("proInterest").onclick=()=>toast("Pro billing is coming soon — beta stays free.");
+  document.getElementById("annualInterest").onclick=()=>toast("Annual billing is coming soon — beta stays free.");
 }
 
 function renderSettings(){
   const u=WSCloud.getUser();
-  const cloudText=!WSCloud.configured()?"Account feature is built but Supabase is not connected yet.":u?`Signed in as <b>${esc(u.email||"")}</b>. Jobs save locally first and sync to your private account.`:"Sign in to turn on private cloud backup and multi-device access.";
+  const cloudText=!WSCloud.configured()?"Account feature is built but Supabase is not connected yet.":u?`Signed in as <b>${esc(u.email||"")}</b>. Jobs save locally first and sync to your private account.`:trialActive()?"You are using Trial Mode. Your one trial job is saved only on this device until you create an account.":"Sign in to turn on private cloud backup and multi-device access.";
   app.innerHTML=`<div class="kicker">WireScout</div><h1>${t("settings")}</h1>
   <div class="card"><h2>Account & Cloud</h2><p class="muted">${cloudText}</p><button class="btn primary block" id="accountBtn">${u?"Manage Account":"Sign In / Create Account"}</button></div>
   <div class="card"><h2>General</h2><label>Language</label><select id="language"><option value="en">English</option><option value="es">Español</option></select><br><br><label>Units</label><select id="units"><option value="imperial">Feet & Inches</option><option value="metric">Metric</option></select></div>
   <div class="card"><h2>Data</h2><p class="muted">Offline-first: your current account keeps a local copy for jobsite use. When online, changes sync to the account.</p><button class="btn block" id="exportData">Export Backup JSON</button></div>
-  <div class="card"><h2>About</h2><p>WireScout Beta — offline-first jobsite walkthroughs for electricians.</p></div>`;
+  <div class="card"><h2>Plans</h2><p class="muted">Beta is free now. Pro is prepared for $9.99/month or $99/year when billing launches.</p><button class="btn block" id="viewPlans">View Plans</button></div>
+  <div class="card"><h2>About</h2><p>WireScout Beta — offline-first jobsite walkthroughs for electricians.</p><p><strong>Built for electricians, by a Master Electrician.</strong></p></div>`;
   language.value=settings.language; units.value=settings.units;
   document.getElementById("accountBtn").onclick=()=>{state.view="account";render();};
+  document.getElementById("viewPlans").onclick=()=>{state.view="plans";render();};
   language.onchange=()=>{settings.language=language.value;WSDB.saveSettings(settings);location.reload();};
   units.onchange=()=>{settings.units=units.value;WSDB.saveSettings(settings);toast("Units saved");};
   document.getElementById("exportData").onclick=()=>{const blob=new Blob([JSON.stringify(WSDB.getJobs(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wirescout-backup.json";a.click();};
@@ -316,6 +349,6 @@ window.addEventListener("wirescout-auth",()=>{const st=document.getElementById("
   await WSCloud.init();
   const st=document.getElementById("syncStatus");
   if(st) st.textContent=WSCloud.getUser()?"✓ Saved to Account":"✓ Saved Offline";
-  if(WSCloud.configured() && !WSCloud.getUser()) state.view="account";
+  if(WSCloud.configured() && !WSCloud.getUser() && !trialActive()) state.view="account";
   render();
 })();
