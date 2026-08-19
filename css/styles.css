@@ -54,3 +54,12 @@ summary{font-weight:700;cursor:pointer}
 .trial-btn{border:2px solid #f7c52b;background:#fff;color:#0b1f3a;font-weight:800}
 
 .master-tagline{font-size:.82em;font-weight:700;color:#f7c52b;line-height:1.5}
+
+/* Recessed light quick specifications */
+.recessed-qty{align-items:flex-start}
+.recessed-options{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.mini-label{font-size:12px;font-weight:700;color:#7a8493;margin-right:1px}
+.mini-pills{display:flex;gap:4px}
+.mini-pill{border:1px solid #d8e0ea;background:#fff;color:#3387f4;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700;line-height:1;min-width:auto}
+.mini-pill.active{background:#f7c94b;border-color:#f7c94b;color:#10213c}
+@media(max-width:520px){.recessed-qty{gap:8px}.recessed-options{max-width:210px}.mini-pill{padding:5px 8px}}
