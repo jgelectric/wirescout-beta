@@ -196,6 +196,11 @@ function renderSection(scope,sec){
 }
 function qtyRow(scope,f){
   const q=scope.quantities[f]||0;
+  if(f==="Recessed Lights"){
+    const size=scope.values["Recessed Light Size"]||"4\"";
+    const type=scope.values["Recessed Light Type"]||"Wafer";
+    return `<div class="qty-row recessed-qty"><div><div>${esc(f)}</div><div class="recessed-options"><span class="mini-label">Size</span><div class="mini-pills" data-recessed-option="Recessed Light Size">${["4\"","6\"","Other"].map(v=>`<button type="button" class="mini-pill ${size===v?"active":""}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div><span class="mini-label">Type</span><div class="mini-pills" data-recessed-option="Recessed Light Type">${["Wafer","Can","Retrofit"].map(v=>`<button type="button" class="mini-pill ${type===v?"active":""}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div></div></div><div class="qty-controls"><button data-qminus="${esc(f)}">−</button><span class="qty-num" data-qnum="${esc(f)}">${q}</span><button data-qplus="${esc(f)}">+</button></div></div>`;
+  }
   return `<div class="qty-row"><div>${esc(f)}</div><div class="qty-controls"><button data-qminus="${esc(f)}">−</button><span class="qty-num" data-qnum="${esc(f)}">${q}</span><button data-qplus="${esc(f)}">+</button></div></div>`;
 }
 function renderAreas(scope){
@@ -229,6 +234,7 @@ function wireSectionActions(job,scope,sec){
     if(b.dataset.other){ box.querySelectorAll("button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); input.classList.add("show"); input.focus(); }
     else { scope.values[key]=b.dataset.v; input.value=b.dataset.v; input.classList.remove("show"); saveJob(job); render(); }
   }));
+  document.querySelectorAll("[data-recessed-option]").forEach(box=>box.querySelectorAll("button").forEach(b=>b.onclick=()=>{scope.values[box.dataset.recessedOption]=b.dataset.v;saveJob(job);render();}));
   document.querySelectorAll("[data-qplus]").forEach(b=>b.onclick=()=>{scope.quantities[b.dataset.qplus]=(scope.quantities[b.dataset.qplus]||0)+1;saveJob(job);render();});
   document.querySelectorAll("[data-qminus]").forEach(b=>b.onclick=()=>{scope.quantities[b.dataset.qminus]=Math.max(0,(scope.quantities[b.dataset.qminus]||0)-1);saveJob(job);render();});
   document.querySelectorAll("[data-yn]").forEach(box=>box.querySelectorAll("button").forEach(b=>b.onclick=()=>{scope.values[box.dataset.yn]=b.dataset.v;saveJob(job);render();}));
